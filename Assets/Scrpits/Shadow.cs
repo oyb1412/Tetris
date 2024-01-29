@@ -26,6 +26,9 @@ public class Shadow : MonoBehaviour
     }
     private void LateUpdate()
     {
+        if (!UIManager.Instance.isLive)
+            return;
+
         count += Time.deltaTime;
         DeleteBlock();
         Copy();
@@ -39,7 +42,7 @@ public class Shadow : MonoBehaviour
     {
         for (int i = 0; i < currentPosition.Length; i++)
         {
-            var pos = currentPosition[i] + Position;
+            var pos = currentPosition[i];
             tilemap.SetTile((Vector3Int)pos, tile);
         }
     }
@@ -47,7 +50,7 @@ public class Shadow : MonoBehaviour
     {
         for (int i = 0; i < currentPosition.Length; i++)
         {
-            var pos = currentPosition[i] + Position;
+            var pos = currentPosition[i];
             tilemap.SetTile((Vector3Int)pos, null);
         }
     }
@@ -55,8 +58,7 @@ public class Shadow : MonoBehaviour
     {
         for (int i = 0; i < currentPosition.Length; i++)
         {
-            currentPosition[i] = board.cells[i];
-            currentPosition[i].x = board.cells[i].x + board.Position.x;
+            currentPosition[i] = board.currentPosition[i];
         }
     }
 
@@ -64,22 +66,25 @@ public class Shadow : MonoBehaviour
     void Drop()
     {
         Vector2Int position = board.Position;
-        board.SetBlock();
+        board.DeleteBlock();
+
         int current = position.y;
         int bottom = -board.boardSize.y / 2 - 1;
         for (int row = current; row >= bottom; row--)
         {
-            position.y = row;
-            if (IsValidMove(position))
+            if (IsValidMove(Vector2Int.down))
             {
-                Position = position;
+                for(int i = 0; i < currentPosition.Length; i++)
+                {
+                    currentPosition[i] += Vector2Int.down;
+                }
             }
             else
             {
                 break;
             }
         }
-        board.DeleteBlock();
+        board.SetBlock();
 
 
 
@@ -92,7 +97,6 @@ public class Shadow : MonoBehaviour
         {
             if (!board.boardRect.Contains((currentPosition[i] + trans)))
             {
-                Debug.Log(currentPosition[i] + trans + "ÄÁÅ×ÀÎ");
                 return false;
             }
             if (board.tilemap.HasTile((Vector3Int)(currentPosition[i] + trans)))
