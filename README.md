@@ -1,164 +1,78 @@
 ## **📃핵심 기술**
 
-### ・플레이어 이동에 따른 맵 위치 동기화
+### ・충돌감지, 객체생성방식이 아닌, 타일맵을 덧그리는 방식으로 보드를 구현
 
 🤔**WHY?**
 
-맵의 위치가 고정되어있어, 플레이어가 이동시 맵을 벗어나버리는 문제 발생
+테트리스라는 게임에서 보드는 지속적으로 생성되고, 반복적인 회전 및 이동이 발생하고, 특정 조건이 발생하면 객체의 일부만을 제거해야하는 상황이 발생한다.
+이를 하나하나 생성을 하고 제거를 하고, 유니티의 충돌감지 시스템을 이용하여 보드끼리의 충돌을 감지하면 연산량이 급격하게 증가하기 때문에,
+보드의 변화가 발생한 타일맵의 셀을 새로 그리는 방식으로 보드의 움직임을 구현
 
 🤔**HOW?**
 
  관련 코드
 
-- Reposition
+- Board
     
     ```csharp
-    using UnityEngine;
-    
-    public class Reposition : MonoBehaviour
-    {
-        //오브젝트간 충돌에서 벗어날때 호출되는 함수
-        private void OnTriggerExit2D(Collider2D collision)
-        {
-            //타일맵과 에리어(플레이어 주변 영역)간의 충돌이 아니면 무시
-            if (!collision.CompareTag("Area"))
-                return;
-    
-            //타일맵의 이동 위치를 정하기 위해 각종 정보를 취득한다.
-            //플레이어 위치 저장
-            Vector2 playerPos = GameManager.instance.player.transform.position;
-    
-            //타일맵 위치 저장
-            Vector2 tilePos = transform.position;
-    
-            //플레이어와 타일간의 거리를 각각 x,y로 절대값으로 저장
-            Vector2 curDiff;
-            curDiff.x = Mathf.Abs(playerPos.x - tilePos.x);
-            curDiff.y = Mathf.Abs(playerPos.y - tilePos.y);
-    
-            //플레이어 방향 저장
-            Vector2 playerVec = GameManager.instance.player.inputVec;
-    
-            //플레이어 방향을 근거로 타일맵의 이동경로 상하좌우를 1,-1로 저장
-            float dirX = playerVec.x > 0 ? 1 : -1;
-            float dirY = playerVec.y > 0 ? 1 : -1;
-    
-            //취득한 정보를 토대로 타일맵의 위치를 변환한다.
-            switch(transform.tag)
-            {
-                //어떤 태그의 오브젝트를 변경할지 결정
-                //태그가 그라운드(타일맵)일때
-                case "Ground":
-                    //플레이어가 타일맵의 x축 방향으로 탈출하려 할 때
-                    if(curDiff.x > curDiff.y)
-                    {
-                        //타일을 x축 방향으로 타일맵크기*2만큼 이동
-                        transform.Translate(new Vector3(dirX * 40f, 0f, 0f));
-                    }
-                    //플레이어가 타일맵의 y축 방향으로 탈출하려 할 때
-                    if (curDiff.y > curDiff.x)
-                    {
-                        //타일을 y축 방향으로 타일맵크기*2만큼 이동
-                        transform.Translate(new Vector3(0f, dirY * 40f, 0f));
-                    }
-                    break;
-                case "Enemy":
-                    if (curDiff.x > curDiff.y)
-                    {
-                        transform.Translate(new Vector3(dirX * 25f + Random.Range(-3f,3f), Random.Range(-3f, 3f), 0f));
-                    }
-                    if (curDiff.y > curDiff.x)
-                    {
-                        transform.Translate(new Vector3(Random.Range(-3f, 3f), dirY * 25f + Random.Range(-3f, 3f), 0f));
-                    }
-                    break;
-            }
-        }
-    }
+  public class Board : MonoBehaviour
+  {
+    private void Update()
+	   {
+    DeleteBlock(); // 매 프레임마다 현재 블록을 지우고
+    ChangeLevel();
+    stepTime += Time.deltaTime;
+    if (Input.GetKeyDown(KeyCode.A)) // 각 인풋에 따른 현재 블록의 데이터를 변경
+        MoveBlock(Vector2Int.left);
+    else if (Input.GetKeyDown(KeyCode.D))
+        MoveBlock(Vector2Int.right);
+    else if (Input.GetKeyDown(KeyCode.S))
+        MoveBlock(Vector2Int.down);
+    else if (Input.GetKeyDown(KeyCode.Q))
+        Rotate(-1);        
+    else if (Input.GetKeyDown(KeyCode.E))
+        Rotate(1);
+    else if (Input.GetKeyDown(KeyCode.Space))
+        HardDrop();
+
+    if (stepTime > stepDelay)
+        Step();
+
+    SetBlock();  //변경된 현재 블록의 데이터대로 타일맵을 새롭게 드로우
+	  }
+  }
     ```
     
 
 🤓**Result!**
 
-플레이어가 4등분된 맵의 한 부분을 벗어날 시, 남겨진 맵을 반대 방향으로 이동시켜 어느 방향으로 이동해도 맵이 무한히 이동되는듯한 효과를 연출
+사용자가 이질감을 느끼지 않으면서도, 타일맵을 새롭게 드로우하는 방식으로 모든 로직을 구현할 수 있게 되어 최적화에 필요한 비용 대폭 감소
 
-### ・하나의 프리펩으로 여러 애너미 관리
+### ・블록이 도착할 위치를 표시해주는 섀도우 블록
 
 🤔**WHY?**
 
-애너미의 종류가 증가할 수록 애너미 프리펩의 수도 증가해, 점점 프리펩 관리가 힘들어지는 문제 발생
+사용자가 블록이 도착할 지점을 어림짐작하며 플레이하는 것이 아닌, 판단할 수 있는 확실한 무엇인가를 표현해주는 로직을 구현하기 위해 제작
 
 🤔**HOW?**
 
  관련 코드
 
-- Spawner
+- Shadow
     
     ```csharp
-    using UnityEngine;
-    
-    public class Spawner : MonoBehaviour
-    {
-        //스폰 포인트를 랜덤으로 하기 위해 자식 오브젝트로 여러개 설정. 저장하기 위한 배열 변수
-        public Transform[] spawnerPoint;
-        public SpawnDate[] spawnDate;
-        public float eleteSpawn = 5;
-        //애너미의 스폰율을 조정하기 위한 타이머
-        float timer;
-        float eleteTimer;
-        public int gameLevel = 0;
-        // Start is called before the first frame update
-        void Start()
-        {
-            //자식 오브젝트로 초기화
-            spawnerPoint = GetComponentsInChildren<Transform>();
-        }
-    
-        // Update is called once per frame
-        void Update()
-        {
-            if (!GameManager.instance.isLive)
-                return;
-    
-            gameLevel = Mathf.Min(GameManager.instance.minTime , spawnDate.Length - 2);
-            Spawn();
-        }
-        //게임레벨로 몹 소환
-        //
-        void Spawn()
-        {
-            timer += Time.deltaTime;
-            eleteTimer += Time.deltaTime;
-            if(eleteTimer > eleteSpawn)
-            {
-                //사용할 프리펩을 파라매터로 입력
-                GameObject enemy = GameManager.instance.pool.Get(0);
-    
-                //스폰된 애너미의 위치는 여러개의 스폰 포인트중 랜덤하게 지정
-                enemy.transform.position = spawnerPoint[UnityEngine.Random.Range(1, spawnerPoint.Length)].position;
-                enemy.GetComponent<Enemy>().Init(spawnDate[5]);
-                eleteTimer = 0;
-            }
-            if (timer > spawnDate[gameLevel].spawnTime)
-            {
-                //사용할 프리펩을 파라매터로 입력
-                GameObject enemy = GameManager.instance.pool.Get(0);
-                //스폰된 애너미의 위치는 여러개의 스폰 포인트중 랜덤하게 지정
-                enemy.transform.position = spawnerPoint[UnityEngine.Random.Range(1, spawnerPoint.Length)].position;
-                enemy.GetComponent<Enemy>().Init(spawnDate[gameLevel]);
-                timer = 0;
-            }
-        }
-    }
-    
-    [System.Serializable]
-    public class SpawnDate
-    {
-        public float spawnTime;
-        public int SpriteType;
-        public int health;
-        public float speed;
-    }
+using UnityEngine;
+using UnityEngine.Tilemaps;
+public class Shadow : MonoBehaviour
+{
+	 private void LateUpdate() // 일반 블록을 따라하는 그림자기 때문에 LateUpdate에서 호출
+	{
+    DeleteBlock(); // 일반 블록과 동일하게, 타일맵을 지우고 새로 드로우하는 방식으로 작동
+    Copy(); // 현재 조작중인 일반 블록의 데이터를 복제해 섀도우 블록에 적용
+    Drop(); // LateUpdate와 Update간의 동기화를 위해 수동으로 섀도우 블록을 한 칸 내려준다.
+    SetBlock(); // 일반 블록과 동일하게, 타일맵을 지우고 새로 드로우하는 방식으로 작동
+	}
+}
     ```
     
 
