@@ -1,34 +1,48 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+/// <summary>
+/// Pause UI 관리
+/// </summary>
 public class UIManager : MonoBehaviour
 {
-    public bool isLive;
-    public GameObject pausePanel;
     public static UIManager Instance;
-    // Start is called before the first frame update
+
+    //현재 게임 진행 여부
+    public bool IsLive { get; private set; }
+    //퍼즈시 출력 UI 오브젝트
+    [SerializeField]private GameObject pausePanel;
+
     private void Awake()
     {
         Instance = this;
     }
     void Start()
     {
-        isLive = true;
+        IsLive = true;
     }
 
+    /// <summary>
+    /// 게임 재개(콜백으로 호출)
+    /// </summary>
     public void ResumeClick()
     {
         pausePanel.SetActive(false);
-        isLive = true;
+        IsLive = true;
     }
+
+    /// <summary>
+    /// 게임 퍼즈(콜백으로 호출)
+    /// </summary>
     public void Pauselick()
     {
         pausePanel.SetActive(true);
-        isLive = false;
+        IsLive = false;
     }
 
+    /// <summary>
+    /// 게임 재시작(콜백으로 호출)
+    /// </summary>
     public void RestartClick()
     {
         SceneManager.LoadScene(0);
